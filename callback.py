@@ -15,7 +15,6 @@ class AccountCallback(pjsua.AccountCallback, GObject.GObject):
         self.emit('register', self.account.info().reg_status)
 
     def on_incoming_call(self, call):
-        print type(call)
         self.emit('incoming', call)
 
 
