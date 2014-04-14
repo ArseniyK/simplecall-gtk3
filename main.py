@@ -1,5 +1,5 @@
 import pjsua
-from gi.repository import Gtk, GLib
+from gi.repository import Gtk, GObject
 from settings import Settings
 from callback import AccountCallback, CallCallback
 
@@ -12,6 +12,7 @@ class Simplecall:
         self.pj = pjsua.Lib()
         self.pj.init()
         self.call = None
+        self.acc = None
         self.settings = Settings(self.pj.enum_snd_dev())
 
         self.dialer = Gtk.Window()
@@ -59,8 +60,13 @@ class Simplecall:
         self.stack.add_named(self.incoming_box, 'incoming')
 
         self.dialer.add(self.stack)
-
         self._pj_start()
+        GObject.timeout_add(1000, self.auto_reconnect)
+
+    def auto_reconnect(self):
+        if self.acc is None or self.acc.info().reg_status !=200:
+            self._pj_reload()
+        return True
 
     def switch_stack(self, name, text=None):
         if name == 'call':
@@ -124,7 +130,7 @@ class Simplecall:
             if self.settings.changed:
                 self.settings.save_settings()
                 self.tray.set_from_stock(Gtk.STOCK_NO)
-                GLib.idle_add(self._pj_reload)
+                GObject.idle_add(self._pj_reload)
                 self.settings.hide()
 
         elif response == Gtk.ResponseType.CANCEL:
@@ -154,12 +160,15 @@ class Simplecall:
             pass
 
     def _pj_stop(self):
-        self.pj.hangup_all()
-        if self.acc is not None:
-            self.acc.delete()
-        if self.pj:
-            self.pj.destroy()
-        self.pj = None
+        try:
+            self.pj.hangup_all()
+            if self.acc is not None:
+                self.acc.delete()
+            if self.pj:
+                self.pj.destroy()
+            self.pj = None
+        except:
+            pass
 
     def register(self, widget, code):
         if code == 200:
@@ -191,7 +200,6 @@ class Simplecall:
         self.call.answer()
 
     def on_state(self, widget, state):
-        print state
         if state == pjsua.CallState.DISCONNECTED:
             self.switch_stack('dialer')
             self.call = None
